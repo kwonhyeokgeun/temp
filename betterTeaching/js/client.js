@@ -53,7 +53,7 @@ window.addEventListener('unload', (ev) => {
 });
 
 function browserDisconnect() {
-	socket.emit(`${roomType}_disconnect`);
+    socket.emit(`${roomType}_disconnect`);
 	shareDisconnect();
 }
 

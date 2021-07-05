@@ -122,9 +122,6 @@ app.post('/make-seminar', (request, response) => {
     let roomId = request.body.room_id;
     let roomName = request.body.input_rm;
     let userName = request.body.input_nm;
-    
-    console.log("seminar roomId:",roomId);
-    console.log("seminar userName:",roomName);
 
     roomList[roomId] = {};
     rooms[roomId] = {
@@ -282,21 +279,19 @@ io.on('connection', function(socket) {
         joinRoomHandler[message.purpose](message, socket);
     });
 
+
     //통신 종료
     socket.on("meeting_disconnect", () => {
         try {
             console.log('meeting disconnect');
-
+            
             let roomId = users[socket.id]['room_id'];
             let socketId = socket.id;
             let userName = users[socket.id]['user_name'];
             let roomType = rooms[roomId]['room_type'];
             let roomLeader = rooms[roomId]['room_leader'];
 
-            if(users[roomId]){
-                delete roomToTime[roomId];
-            }
-
+            
             numOfUsers[roomId]--;
 
             deleteUser(socketId, roomId);
@@ -308,6 +303,10 @@ io.on('connection', function(socket) {
                 userName: userName,
                 purpose: roomType,
             });
+            if(users[roomId]===undefined){
+                delete roomToTime[roomId];
+            }
+
 
             if(roomLeader !== socket.id) closeSenderPCs(socket.id, 'meeting');
             else {
@@ -321,22 +320,29 @@ io.on('connection', function(socket) {
         } catch (error) {
             console.error(error);
         }
+        show_state('meeting')
     });
 
     socket.on('seminar_disconnect', () => {
         try {
             console.log('seminar disconnect');
-
+        
             var roomId = users[socket.id]['room_id'];
             var roomLeader = rooms[roomId]['room_leader'];
+            let roomType = rooms[roomId]['room_type'];
             
             deleteUser(socket.id, roomId);
+            closeReceiverPC(socket.id, roomType);
+            closeSenderPCs(socket.id, roomType);
             
             socket.broadcast.to(roomId).emit("user_exit", { 
                 socketId: socket.id,
             });
 
             numOfUsers[roomId]--;
+            if(users[roomId]===undefined){
+                delete roomToTime[roomId];
+            }
 
             if(roomLeader !== socket.id) closeSenderPCs(socket.id, 'seminar');
             else {
@@ -350,6 +356,7 @@ io.on('connection', function(socket) {
         } catch(err) {
             console.error(err);
         }
+        show_state('seminar')
     });
 
     socket.on('share_disconnect', () => {
@@ -619,7 +626,7 @@ function shareOntrackHandler(stream, socket, roomId, userName) {
 }
 
 function meetingJoinRoomHandler(message, socket) {
-    console.log(message.roomId,',',message.senderSocketId);
+    console.log('meeting room:',message.roomId,',',message.userName ,message.senderSocketId);
     try {
         let rows = [];
         for(var key in roomList[message.roomId]) {
@@ -645,6 +652,7 @@ function meetingJoinRoomHandler(message, socket) {
 }
 
 function seminarJoinRoomHandler(message, socket) {
+    console.log('meeting room:',message.roomId,',',message.userName ,message.senderSocketId);
     try {
         let rows = [];
         for(var key in roomList[message.roomId]) {
@@ -688,7 +696,7 @@ function deleteUser(socketId, roomId) {
 
 //받는 peerConnection 종료
 function closeReceiverPC(socketId, purpose) {
-    if (!receivePCs[purpose][socketId]) return;
+    if (receivePCs[purpose][socketId]===undefined) return;
 
     receivePCs[purpose][socketId].close();
     delete receivePCs[purpose][socketId];
@@ -696,7 +704,7 @@ function closeReceiverPC(socketId, purpose) {
 
 //보내는 peerConnection 종료
 function closeSenderPCs(socketId, purpose) {
-    if(!sendPCs[purpose][socketId]) return;
+    if(sendPCs[purpose][socketId]===undefined) return;
 
     for(var key in sendPCs[purpose][socketId]) {
         sendPCs[purpose][socketId][key].close();
@@ -704,4 +712,17 @@ function closeSenderPCs(socketId, purpose) {
     }
 
     delete sendPCs[purpose][socketId];
+}
+
+function show_state(purpose){
+    console.log("state==========");
+    console.log("sendPcs:",sendPCs[purpose])
+    console.log("receivePCs:",receivePCs[purpose])
+    
+    /*
+    console.log("roomList",roomList);
+    console.log("users",users)
+    console.log("roomToTime:",roomToTime)
+    console.log("roomList:",roomList)
+    */
 }

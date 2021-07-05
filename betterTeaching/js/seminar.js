@@ -37,6 +37,7 @@ function presenterStart(userName, roomId) {
             socket.emit("join_room", {
                 senderSocketId: socket.id,
                 roomId: roomId,
+                userName: userName,
                 purpose: 'seminar',
             });
             console.log("socket emit senderoffer")
@@ -54,6 +55,7 @@ function presenterStart(userName, roomId) {
             socket.emit("join_room", {
                 senderSocketId: socket.id,
                 roomId: roomId,
+                userName: userName,
                 purpose: 'seminar'
             });
 		});
