@@ -312,6 +312,7 @@ io.on('connection', function(socket) {
             else {
                 for(var key in roomList[roomId]) {
                     closeReceiverPC(key, 'meeting');
+                    deleteUser(key, roomId);
                 }
                 delete userStreams['meeting'][socket.id];
                 delete rooms[roomId];
@@ -348,6 +349,7 @@ io.on('connection', function(socket) {
             else {
                 for(var key in roomList[roomId]) {
                     closeReceiverPC(key, 'seminar');
+                    deleteUser(key, roomId);
                 }
                 delete userStreams['seminar'][socket.id];
                 delete rooms[roomId];
