@@ -44,7 +44,7 @@ let roomId;     //방 id
 let roomType;   //방 타입 (meeting or seminar)
 let numOfUsers; //방 접속 인원 수
 let roomTime;   //
-//let shareSwitch = false;   //화면 공유 스위치 (방 당 1명 밖에 공유 못함)
+let shareSwitch = false;   //화면 공유 스위치 (방 당 1명 밖에 공유 못함)
 let shareSocketId;
 //----------------------------------------------------------------------------------------
 
@@ -268,6 +268,8 @@ socket.on("share_disconnect", () => {
     responseShareDisconnect();
 });
 
-socket.on("share_possible", () => {
-    shareStart();
+socket.on("share_possible", (data) => {
+    console.log("MorS:",data.MorS)
+    shareStart(data.MorS);
+
 });

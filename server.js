@@ -480,17 +480,11 @@ io.on('connection', function(socket) {
         });
     });
 
-    socket.on("share_question", () => {
-        console.log("share_question")
+    socket.on("share_question", (data) => {
         if(shareSwitch[users[socket.id]['room_id']]) return;
 
-        io.to(socket.id).emit("share_possible");
-        console.log("share_possible")
+        io.to(socket.id).emit("share_possible",data);
         shareSwitch[users[socket.id]['room_id']] = true;
-    });
-
-    socket.on("out", () => {
-        console.log("out!!!!!!!!")
     });
 });
 
@@ -537,8 +531,8 @@ function createReceiverPeerConnection(socket, roomId, userName, ontrackHandler, 
         if(once_ontrack==1){ //video, audio로 두번하므로 한번만 하도록
             console.log("once check");
             ontrackHandler(e.streams[0], socket, roomId, userName);
-            once_ontrack+=1;
         }
+        once_ontrack+=1;
     }
     return pc;
 }
@@ -574,6 +568,7 @@ async function createReceiverAnswer(offer, pc) {
 }
 
 function meetingOntrackHandler(stream, socket, roomId, userName) {
+    console.log('meeting handler')
     /*
     if(ontrackSwitch) {
         ontrackSwitch = false;
@@ -604,6 +599,7 @@ function meetingOntrackHandler(stream, socket, roomId, userName) {
 }
 
 function seminarOntrackHandler(stream, socket, roomId, userName) {
+    console.log('seminar handler')
     /*
     if(ontrackSwitch) {
         ontrackSwitch = false;
@@ -629,11 +625,12 @@ function seminarOntrackHandler(stream, socket, roomId, userName) {
     });	
     */
 
-    //ontrackSwitch = true;
+    ontrackSwitch = true;
     return;
 }
 
 function shareOntrackHandler(stream, socket, roomId, userName) {
+    console.log('share handler')
     //if(ontrackSwitch) {
     //    ontrackSwitch = false;
     //    return;
@@ -674,7 +671,7 @@ function meetingJoinRoomHandler(message, socket) {
 }
 
 function seminarJoinRoomHandler(message, socket) {
-    console.log('meeting room:',message.roomId,',',message.userName ,message.senderSocketId);
+    console.log('seminar room:',message.roomId,',',message.userName ,message.senderSocketId);
     try {
         let rows = [];
         for(var key in roomList[message.roomId]) {

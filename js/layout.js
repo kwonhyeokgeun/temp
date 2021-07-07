@@ -11,7 +11,6 @@ $(function(){
 
 	$('#share').click(function(event) {
 		$('.menu').fadeOut();
-		shareRequest();
 	});
 
 	// chat
