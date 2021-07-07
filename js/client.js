@@ -44,7 +44,7 @@ let roomId;     //방 id
 let roomType;   //방 타입 (meeting or seminar)
 let numOfUsers; //방 접속 인원 수
 let roomTime;   //
-let shareSwitch = false;   //화면 공유 스위치 (방 당 1명 밖에 공유 못함)
+//let shareSwitch = false;   //화면 공유 스위치 (방 당 1명 밖에 공유 못함)
 let shareSocketId;
 //----------------------------------------------------------------------------------------
 
@@ -76,7 +76,7 @@ function onload() {
 }
 
 //스트림 보내는 역할의 peerConnection 객체 생성
-function createSenderPeerConnection(stream, purpose) {
+function createSenderPeerConnection(stream, purpose, is_audio_true = 1) {
     let pc = new RTCPeerConnection(pc_config);
     
     pc.oniceconnectionstatechange = (e) => {
@@ -97,7 +97,9 @@ function createSenderPeerConnection(stream, purpose) {
         var videoTrack = stream.getVideoTracks()[0];
         var audioTrack = stream.getAudioTracks()[0];
         pc.addTrack(videoTrack, stream);
-        pc.addTrack(audioTrack, stream);
+        console.log("audio:",is_audio_true)
+        if(is_audio_true !=0)
+            pc.addTrack(audioTrack, stream);
     } else {
         console.log("no localStream");
     }
@@ -125,8 +127,13 @@ function createReceiverPeerConnection(senderSocketId, userName, purpose, ontrack
     }
 
     //스트림 보내는 쪽의 peerConnection에서 addTrack시 이벤트 발생
+    var once = 1;
     pc.ontrack = (e) => {
-        ontrackHandler(e.streams[0], userName, senderSocketId);
+        if(once == 1){
+            ontrackHandler(e.streams[0], userName, senderSocketId);
+            console.log('한번만 나오는지')
+        }
+        once+=1;
     }
 
     return pc;

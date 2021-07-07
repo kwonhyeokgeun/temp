@@ -1,7 +1,16 @@
-let ontrackSwitch = false;
+//let ontrackSwitch = false;
+
+/*window.addEventListener("beforeunload", function(e){
+        browserDisconnect()
+        socket.emit("out")
+        return 0;
+    
+});   //방장이 나갈시 sendPcs가 삭제되지않는 문제있음
+*/
+
 
 function shareRequest() {
-    if(shareSwitch) return;
+    //if(shareSwitch) return;
     socket.emit('share_question');
 }
 
@@ -10,7 +19,9 @@ function shareStart() {
         audio:true,
         video:true
     }).then(async function(stream){ 
-        shareSwitch = true;
+        console.log("stream check:",stream.getAudioTracks().length);//1이면 audio(o) 0이면 audio(x)
+        var is_audio_true = stream.getAudioTracks().length
+        //shareSwitch = true;
         shareSocketId = socket.id;
         setPresenterShareView();
 
@@ -20,7 +31,7 @@ function shareStart() {
         document.getElementsByClassName('nicknm')[0].innerHTML = userName;
         document.getElementsByClassName('inner')[0].style = 'display: none;';
 
-        sendPC['share'] = createSenderPeerConnection(stream, 'share');
+        sendPC['share'] = createSenderPeerConnection(stream, 'share',is_audio_true);
         let offer = await createSenderOffer(sendPC['share']);
 
         await socket.emit('sender_offer', {
@@ -36,13 +47,13 @@ function shareStart() {
 }
 
 function shareOntrackHandler(stream, userName, senderSocketId) {
-    if(ontrackSwitch) {
-        ontrackSwitch = false;
-        return;
-    }
+    //if(ontrackSwitch) {
+    //    ontrackSwitch = false;
+    //    return;
+    //}
     ontrackSwitch = true;
     setAudienceShareView();
-    shareSwitch = true;
+    //shareSwitch = true;
 	document.getElementsByClassName('inner')[0].style = "display: none;";
 
     document.getElementById('share_video').srcObject = stream;
@@ -68,29 +79,29 @@ async function shareRequestHandler(message) {
 }
 
 function shareDisconnect() {
+    console.log("종료하기 클릭됨");
     removePresenterShareView();
 
-    document.getElementsByClassName('inner')[0].style = "display: block;";
+    document.getElementsByClassName('inner')[0].style = "display: block;"; //원래 비디오 보이게
 
     $('.header .r_hcont .second .h_btn.p_people').removeClass('off').addClass('on');
 	$('.header .r_hcont .second .h_btn.share').removeClass('on').addClass('off');
 
     socket.emit('share_disconnect');
-    shareSwitch = false;
+    //shareSwitch = false;
 }
 
 function responseShareDisconnect() {
-    document.getElementById('share_video').srcObject = null;
-    document.getElementById('self_view').srcObject = null;
+    document.getElementById('share_video').srcObject = null;  
+    document.getElementsByClassName('self_view').srcObject = null;    
 
-	console.log("share disconnect response");
 
     removeAudienceShareView();
-
+    document.getElementsByClassName('inner')[0].style = "display: block;"; //원래 비디오 보이게
     $('.header .r_hcont .second .h_btn.p_people').removeClass('off').addClass('on');
 	$('.header .r_hcont .second .h_btn.share').removeClass('on').addClass('off');
 
-    shareSwitch = false;
+    //shareSwitch = false;
 }
 
 function setPresenterShareView() {
@@ -105,7 +116,8 @@ function setPresenterShareView() {
     p2.innerHTML = '공유 중';
     p3.innerHTML = '입니다';
     a.href = "#";
-    a.onclick = shareDisconnect;
+
+    a.setAttribute("onClick", "shareDisconnect()");  //클릭시 종료하도록
     a.innerHTML = '종료하기';
 
     chat1_1_cc.appendChild(p1);
@@ -119,6 +131,7 @@ function setPresenterShareView() {
 }
 
 function setAudienceShareView() {
+    console.log('몇번나올까')
     var view_all = document.createElement('div');
     var div_va = document.createElement('div');
     var share_video = document.createElement('video');
@@ -156,17 +169,26 @@ function setAudienceShareView() {
 }
 
 function removePresenterShareView() {
-    var view_all = document.getElementsByClassName('view_all')[0];
-    view_all.parentNode.removeChild(view_all);
+    //var view_all = document.getElementsByClassName('view_all')[0];
+    //console.log(view_all)
+    //view_all.parentNode.removeChild(view_all);
     var chat1_1_cc = document.getElementsByClassName('chat1_1_cc')[0];
-    chat1_1_cc.parentNode.removeChild(chat1_1_cc);
-    var view_lbox = document.getElementsByClassName('view_lbox')[0];
-    view_lbox.parentNode.removeChild(view_lbox);
+    chat1_1_cc.parentNode.removeChild(chat1_1_cc);   
+    //var view_lbox = document.getElementsByClassName('view_lbox')[0];
+    //view_lbox.parentNode.removeChild(view_lbox);
 }
 
 function removeAudienceShareView() {
+    /*
     var view_all = document.getElementsByClassName('view_all')[0];
     view_all.parentNode.removeChild(view_all);
+    
     var view_lbox = document.getElementsByClassName('view_lbox')[0];
     view_lbox.parentNode.removeChild(view_lbox);
+    */
+    var cont = document.getElementsByClassName('cont')[0];
+    var view_all = document.getElementsByClassName('view_all')[0];
+    cont.removeChild(view_all);
+    var view_lbox = document.getElementsByClassName('view_lbox')[0];
+    cont.removeChild(view_lbox);
 }
