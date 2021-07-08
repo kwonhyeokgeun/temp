@@ -1,20 +1,19 @@
 //let ontrackSwitch = false;
 
-/*window.addEventListener("beforeunload", function(e){
+window.addEventListener("beforeunload", function(e){
         browserDisconnect()
-        socket.emit("out")
+        socket.emit("ex")
         return 0;
     
-});   //방장이 나갈시 sendPcs가 삭제되지않는 문제있음
-*/
+}); 
 
-function shareRequest(MorS) {
-    
-    socket.emit('share_question',{MorS:MorS});
+
+function shareRequest() {
+    socket.emit('share_question');
     
 }
 
-function shareStart(MorS) {
+function shareStart() {
     navigator.mediaDevices.getDisplayMedia({
         audio:true,
         video:true
@@ -23,15 +22,15 @@ function shareStart(MorS) {
         var is_audio_true = stream.getAudioTracks().length
         //shareSwitch = true;
         shareSocketId = socket.id;
-        setPresenterShareView(MorS);
+        setPresenterShareView();
 
 		$('.header .r_hcont .second .h_btn.p_people').removeClass('on').addClass('off');
 		$('.header .r_hcont .second .h_btn.share').removeClass('off').addClass('on');
 
         document.getElementsByClassName('nicknm')[0].innerHTML = userName;
-        if(MorS == 'meeting')
+        if(roomType == 'meeting')
             document.getElementsByClassName('inner')[0].style = 'display: none;';
-        if(MorS == 'seminar'){
+        if(roomType == 'seminar'){
             document.getElementsByClassName('view_all')[0].style = 'display: none;';
         }
         sendPC['share'] = createSenderPeerConnection(stream, 'share',is_audio_true);
@@ -116,6 +115,8 @@ function responseShareDisconnect() {  //공유 받는자의 화면설정
         document.getElementsByClassName('inner')[0].style = "display: block;"; //원래 비디오 보이게
     }
     if(roomType == 'seminar'){
+        var view_all= document.getElementsByClassName('view_all')[0]
+        view_all.removeChild(view_all.childNodes[0]);  //shareview 삭제
         document.getElementsByClassName('presenterVideo')[0].style = "display: block;"; //원래 비디오 보이게
     }
     $('.header .r_hcont .second .h_btn.p_people').removeClass('off').addClass('on');
@@ -124,7 +125,7 @@ function responseShareDisconnect() {  //공유 받는자의 화면설정
     //shareSwitch = false;
 }
 
-function setPresenterShareView(MorS) {
+function setPresenterShareView() {
     var chat1_1_cc = document.createElement('div');
     var p1 = document.createElement('p');
     var p2 = document.createElement('p');
@@ -146,9 +147,9 @@ function setPresenterShareView(MorS) {
     chat1_1_cc.appendChild(a);
 
     var container = document.getElementsByClassName('cont')[0];
-    if(MorS=='meeting')
+    if(roomType=='meeting')
         container.insertBefore(chat1_1_cc, document.getElementsByClassName('inner')[0]);
-    if(MorS=='seminar')
+    if(roomType=='seminar')
         container.insertBefore(chat1_1_cc, document.getElementsByClassName('view_all')[0]);
     
 }
@@ -215,7 +216,8 @@ function seminar_setAudienceShareView() {
     info_ctxt.className = 'info_ctxt';
     nicknm.className = 'nicknm';
 
-    view_all.appendChild(div_va);
+    //view_all.appendChild(div_va);
+    view_all.insertBefore(div_va,view_all.childNodes[0]);
     div_va.appendChild(share_video);
     view_lbox.appendChild(self_view);
     self_view.appendChild(div_sv);
@@ -226,7 +228,7 @@ function seminar_setAudienceShareView() {
     var container = document.getElementsByClassName('cont')[0];
 
     container.appendChild(view_lbox);
-    container.insertBefore(view_all, document.getElementsByClassName('view_lbox')[0]);
+    //container.insertBefore(view_all, document.getElementsByClassName('view_lbox')[0]);
 }
 
 function removePresenterShareView() {
