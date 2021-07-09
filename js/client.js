@@ -1,4 +1,4 @@
-const socket = io('https://betterteaching.xyz', {secure: true});
+const socket = io('https://localhost', {secure: true});
 
 const pc_config = {
     iceServers: [
@@ -257,6 +257,10 @@ socket.on("user_exit", (message) => {
 //처음 방에 접속한 user가 이미 방안에 들어와있던 user들의 정보를 받기 위한 이벤트
 socket.on("all_users", (message) => {
     allUsersHandler(message);
+});
+
+socket.on("share_users", (message) => {
+    shareUserHandler(message);
 });
 
 socket.on("room_info", (message) => {

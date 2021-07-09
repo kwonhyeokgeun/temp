@@ -20,7 +20,7 @@ function shareStart() {
     }).then(async function(stream){ 
         console.log("stream check:",stream.getAudioTracks().length);//1이면 audio(o) 0이면 audio(x)
         var is_audio_true = stream.getAudioTracks().length
-        //shareSwitch = true;
+  
         shareSocketId = socket.id;
         setPresenterShareView();
 
@@ -29,7 +29,7 @@ function shareStart() {
 
         document.getElementsByClassName('nicknm')[0].innerHTML = userName;
         if(roomType == 'meeting')
-            document.getElementsByClassName('inner')[0].style = 'display: none;';
+            document.getElementsByClassName('inner')[0].style = 'display: none;';  //공유자 화면의 기존화면 안보이게
         if(roomType == 'seminar'){
             document.getElementsByClassName('view_all')[0].style = 'display: none;';
         }
@@ -48,34 +48,27 @@ function shareStart() {
     });
 }
 
-function shareOntrackHandler(stream, userName, senderSocketId) {
-    //if(ontrackSwitch) {
-    //    ontrackSwitch = false;
-    //    return;
-    //}
-    //ontrackSwitch = true;
+function shareOntrackHandler(stream, userName, senderSocketId) {  //공유받는자의 화면 처리
     if(roomType == 'meeting'){//미팅인 경우
         meeting_setAudienceShareView();
-        document.getElementsByClassName('inner')[0].style = "display: none;";
+        document.getElementsByClassName('inner')[0].style = "display: none;";  //기존 화면 안보이게
         document.getElementById('share_video').srcObject = stream;
         document.getElementById('self_video').srcObject = userStreams['meeting'][senderSocketId];
-        document.getElementsByClassName('nicknm')[0].innerHTML = userName;
+        document.getElementsByClassName('nicknm')[0].innerHTML = userName;   //share viedo에 stream넣기
     }
     if(roomType == 'seminar'){//세미나인 경우
         seminar_setAudienceShareView();
-        document.getElementsByClassName('presenterVideo')[0].style = "display: none;";
+        document.getElementsByClassName('presenterVideo')[0].style = "display: none;";  //기존 화면 안보이게
         document.getElementById('share_video').srcObject = stream;
         document.getElementById('self_video').srcObject = userStreams['seminar'][senderSocketId];
-        document.getElementsByClassName('nicknm')[0].innerHTML = userName;
+        document.getElementsByClassName('nicknm')[0].innerHTML = userName;   //share viedo에 stream넣기
     }
-    //shareSwitch = true;
-	
-
+   
 	$('.header .r_hcont .second .h_btn.p_people').removeClass('on').addClass('off');
 	$('.header .r_hcont .second .h_btn.share').removeClass('off').addClass('on');
 }
 
-async function shareRequestHandler(message) {
+async function shareRequestHandler(message) { //share요청 받기
     receivePCs['share'][message.socketId] = createReceiverPeerConnection(message.socketId, message.userName, 'share', shareOntrackHandler);
     let offer = await createReceiverOffer(receivePCs['share'][message.socketId]);
 
@@ -87,6 +80,26 @@ async function shareRequestHandler(message) {
         senderSocketId: message.socketId,
         purpose: 'share',
     });
+}
+
+async function shareUserHandler(message) {//방에 접속했는데 이미 화면공유중이면 이 핸들러동작
+    try {
+        var socketId = message.users[0].socket_id;  //현재 화면공유중인 socketId
+        var userName = message.users[0].user_name;
+        //현재 화면공유중인 화면에 대한 pc, offer처리
+        receivePCs['share'][socketId] = createReceiverPeerConnection(socketId, userName, 'share', shareOntrackHandler);  
+        let offer = await createReceiverOffer(receivePCs['share'][socketId]);
+
+        await socket.emit("receiver_offer", {
+            offer,
+            receiverSocketId: socket.id,
+            senderSocketId: socketId,
+            purpose: 'share',
+        });	
+        
+    } catch(err) {
+        console.error(err);
+    }
 }
 
 function shareDisconnect() {   //공유자의 화면설정
@@ -101,8 +114,9 @@ function shareDisconnect() {   //공유자의 화면설정
     $('.header .r_hcont .second .h_btn.p_people').removeClass('off').addClass('on');
 	$('.header .r_hcont .second .h_btn.share').removeClass('on').addClass('off');
 
+    receivePCs['share']={};
     socket.emit('share_disconnect');
-    //shareSwitch = false;
+    
 }
 
 function responseShareDisconnect() {  //공유 받는자의 화면설정
@@ -121,8 +135,7 @@ function responseShareDisconnect() {  //공유 받는자의 화면설정
     }
     $('.header .r_hcont .second .h_btn.p_people').removeClass('off').addClass('on');
 	$('.header .r_hcont .second .h_btn.share').removeClass('on').addClass('off');
-
-    //shareSwitch = false;
+    receivePCs['share']={};
 }
 
 function setPresenterShareView() {
@@ -235,7 +248,7 @@ function removePresenterShareView() {
     //var view_all = document.getElementsByClassName('view_all')[0];
     //console.log(view_all)
     //view_all.parentNode.removeChild(view_all);
-    var chat1_1_cc = document.getElementsByClassName('chat1_1_cc')[0];
+    var chat1_1_cc = document.getElementsByClassName('chat1_1_cc')[0]; //화면공유중단 버튼 없애기
     chat1_1_cc.parentNode.removeChild(chat1_1_cc);   
     //var view_lbox = document.getElementsByClassName('view_lbox')[0];
     //view_lbox.parentNode.removeChild(view_lbox);
@@ -258,4 +271,6 @@ function removeAudienceShareView() {
     var view_lbox = document.getElementsByClassName('view_lbox')[0];
     cont.removeChild(view_lbox);
 }
+
+
 

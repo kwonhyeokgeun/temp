@@ -21,8 +21,8 @@ app.use(express.static(__dirname));
 app.use(bodyParser.urlencoded({extended: false}));
 
 const options = {
-    key: fs.readFileSync('/etc/letsencrypt/live/betterteaching.xyz/privkey.pem'),
-    cert: fs.readFileSync('/etc/letsencrypt/live/betterteaching.xyz/fullchain.pem')
+    key: fs.readFileSync('./key/privkey.pem'),
+    cert: fs.readFileSync('./key/cert.crt')
 };
 
 const server = https.createServer(options, app).listen(443, () => {
@@ -53,8 +53,9 @@ let userStreams = {
 };
 let numOfUsers = {};
 
-let shareSwitch = {};
-//let ontrackSwitch = false;
+let shareSwitch = {};  //해당 room이 true이면 현재 화면공유중
+let shareUserId={};   //해당 room의 화면공유자의 id를 가짐
+
 //-------------------------------------------------------------------------------------
 
 app.get('/', (request, response) => {
@@ -277,6 +278,9 @@ io.on('connection', function(socket) {
     //방에 처음 접속한 user에게 접속하고 있었던 user들의 정보를 제공하는 역할
     socket.on("join_room", async (message) => {
         joinRoomHandler[message.purpose](message, socket);
+        if(shareSwitch[message.roomId]==true){
+            shareJoinRoomHandler(message,socket);
+        }
     });
 
 
@@ -303,10 +307,6 @@ io.on('connection', function(socket) {
                 userName: userName,
                 purpose: roomType,
             });
-            if(users[roomId]===undefined){
-                delete roomToTime[roomId];
-            }
-
 
             if(roomLeader !== socket.id) closeSenderPCs(socket.id, 'meeting');
             else {
@@ -319,6 +319,10 @@ io.on('connection', function(socket) {
                 delete rooms[roomId];
                 delete roomList[roomId];
                 delete numOfUsers[roomId];
+            }
+
+            if(roomList[roomId]===undefined){
+                delete roomToTime[roomId];
             }
         } catch (error) {
             console.error(error);
@@ -344,9 +348,6 @@ io.on('connection', function(socket) {
             });
 
             numOfUsers[roomId]--;
-            if(users[roomId]===undefined){
-                delete roomToTime[roomId];
-            }
 
             if(roomLeader !== socket.id) closeSenderPCs(socket.id, 'seminar');
             else {
@@ -358,6 +359,9 @@ io.on('connection', function(socket) {
                 delete rooms[roomId];
                 delete roomList[roomId];
                 delete numOfUsers[roomId];
+            }
+            if(roomList[roomId]===undefined){
+                delete roomToTime[roomId];
             }
         } catch(err) {
             console.error(err);
@@ -390,6 +394,7 @@ io.on('connection', function(socket) {
 
         //delete shareSwitch[users[socket.id]['room_id']];
         shareSwitch[users[socket.id]['room_id']] =false;
+        delete shareUserId[users[socket.id]['room_id']];
     });
 
     socket.on('room_info', (message) => {
@@ -475,7 +480,8 @@ io.on('connection', function(socket) {
         console.log("userStreams:",userStreams['share'])
         //console.log("roomList",roomList);
         console.log("users",users)
-        console.log("shareSwitch",shareSwitch)
+        console.log("roomList:",roomList)
+        console.log("shareUserId:",shareUserId);
     });
 
     socket.on("ex",function (data){  //확인용
@@ -493,6 +499,7 @@ io.on('connection', function(socket) {
 
         io.to(socket.id).emit("share_possible");
         shareSwitch[users[socket.id]['room_id']] = true;
+        shareUserId[users[socket.id]['room_id']]=socket.id;
     });
 });
 
@@ -577,12 +584,7 @@ async function createReceiverAnswer(offer, pc) {
 
 function meetingOntrackHandler(stream, socket, roomId, userName) {
     console.log('meeting handler')
-    /*
-    if(ontrackSwitch) {
-        ontrackSwitch = false;
-        return;
-    }
-    */
+   
     userStreams['meeting'][socket.id] = stream;
 
     socket.broadcast.to(roomId).emit("user_enter", { 
@@ -601,28 +603,21 @@ function meetingOntrackHandler(stream, socket, roomId, userName) {
         socket.emit('get_chat',result)
     });	
     */
-
-    //ontrackSwitch = true;
     return;
 }
 
 function seminarOntrackHandler(stream, socket, roomId, userName) {
     console.log('seminar handler')
-    /*
-    if(ontrackSwitch) {
-        ontrackSwitch = false;
-        return;
-    }
-    */
-    userStreams['seminar'][socket.id] = stream;
-
-    socket.broadcast.to(roomId).emit("user_enter", { 
+   /*  
+    socket.broadcast.to(roomId).emit("user_enter", {    //세미나는 첫 접속자가 왔을때만 ontrackHandler가 실행되는데 이때는 broadcast해도 받을 socket이 없어서 의미없음
         socketId: socket.id,
         roomId: roomId,
         userName: userName,
         purpose: 'seminar',
     });
-    
+    */
+    userStreams['seminar'][socket.id] = stream;
+   
     //이전 채팅 보내기 
     /*
     connection.query("SELECT * FROM chat_db where roomId = '"+roomId+"' and roomTime ="+roomToTime[roomId], function (err, result, fields) {
@@ -633,23 +628,17 @@ function seminarOntrackHandler(stream, socket, roomId, userName) {
     });	
     */
 
-    ontrackSwitch = true;
     return;
 }
 
 function shareOntrackHandler(stream, socket, roomId, userName) {
     console.log('share handler')
-    //if(ontrackSwitch) {
-    //    ontrackSwitch = false;
-    //    return;
-    //}
+   
     socket.broadcast.to(roomId).emit('share_request', {
         userName: userName,
         socketId: socket.id,
     });
     userStreams['share'][socket.id] = stream;
-
-    //ontrackSwitch = true;
 }
 
 function meetingJoinRoomHandler(message, socket) {
@@ -710,7 +699,26 @@ function seminarJoinRoomHandler(message, socket) {
     }
 }
 
-//DB에서 나간 유저의 정보 삭제
+function shareJoinRoomHandler(message, socket) {//현재 화면공유중이라면 화면공유 정보를 넘김
+    try {
+        let rows = [];
+        key =  shareUserId[message.roomId] //공유자 id가 key로 바꾸기
+        rows.push({
+            socket_id: key,   
+            user_name: users[key]['user_name'],
+        });
+        
+
+        io.to(message.senderSocketId).emit("share_users", { 
+            users: rows,
+        });
+
+    } catch (error) {
+        console.error(error);
+    }
+}
+
+//나간 유저의 정보 삭제
 //마지막 유저가 나가면 방이 삭제됨
 function deleteUser(socketId, roomId) {
     delete roomList[roomId][socketId];
@@ -720,7 +728,7 @@ function deleteUser(socketId, roomId) {
         delete roomList[roomId];
         delete rooms[roomId];
         delete shareSwitch[roomId];
-
+        if(shareUserId[roomId] != undefined) delete shareUserId[roomId];
         return;
     }
 }
