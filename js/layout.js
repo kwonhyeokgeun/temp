@@ -57,7 +57,8 @@ $(function(){
 			document.getElementsByClassName('view_all')[0].style = "display: block;";
 			console.log('share display');
 		}
-		document.getElementsByClassName('inner')[0].style = "display: none;";
+		//document.getElementsByClassName('inner')[0].style = "display: none;";
+		document.getElementById('cont_inner').style = "display: none;";
 	});
 	
 	// slick
