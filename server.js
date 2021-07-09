@@ -21,8 +21,8 @@ app.use(express.static(__dirname));
 app.use(bodyParser.urlencoded({extended: false}));
 
 const options = {
-    key: fs.readFileSync('./key/privkey.pem'),
-    cert: fs.readFileSync('./key/cert.crt')
+    key: fs.readFileSync('/etc/letsencrypt/live/betterteaching.xyz/privkey.pem'),
+    cert: fs.readFileSync('/etc/letsencrypt/live/betterteaching.xyz/fullchain.pem')
 };
 
 const server = https.createServer(options, app).listen(443, () => {
