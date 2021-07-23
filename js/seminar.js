@@ -15,7 +15,9 @@ function seminarStart(userName, roomId, leader) {
     if(leader !== socket.id) {
         audienceStart(userName, roomId, leader);
         document.getElementsByClassName('cc_btn')[1].style = 'display: none;';   //화면 공유 버튼 없애기
-        document.getElementsByClassName('h_btn share on')[0].style = 'display: none;';
+        //document.getElementsByClassName('h_btn share on')[0].style = 'display: none;';
+        document.getElementsByClassName('h_btn')[0].setAttribute("onclick","");
+
         
         return;
     }
@@ -161,4 +163,11 @@ function insertAudienceBox(userName, socketId) {
     nicknm.innerHTML = userName;
 
     document.getElementsByClassName('slick-slide slick-current slick-active')[0].appendChild(li);
+}
+
+//no back
+history.pushState(null,null,location.href);
+window.onpopstate = function(event) {
+    console.log("No Back");
+    history.go(1);
 }

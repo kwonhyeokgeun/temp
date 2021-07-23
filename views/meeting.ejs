@@ -35,7 +35,7 @@
 			<div class="header">
 				<div class="flo_left l_hcont">
 					<img src="img/menu_icon.png" alt="메뉴" class="menuicon"/>
-					<h1>함께하는 방과후 English Class</h1>
+					<h1>함께하는 BETTER TEACHING</h1>
 				</div>				
 				<div class="flo_right r_hcont">
 					<div class="d_ib first">
@@ -70,11 +70,23 @@
 						-->
 					</ul>
 				</div>
+				<!--file download-->
+				<form name='fileform' action="/download" method="post" target="if">
+					<input type="hidden" name="filename"/>
+				</form>
+				
 				<div class="bottom">
 					<textarea id ="msg_box" onkeyup="enterkey()" placeholder="메세지를 입력하세요"></textarea>
 					<div class="btn_file">
-						<a class="btn" input type="button" onclick="send_msg()">전송</a>
-						<!--<a href="" class="file"><img src="img/icon_file.png"/></a>-->
+						<!--file upload-->
+						<a id="btn_send" class="btn" input type="button" onclick="send_msg(); send_file();" style="cursor:pointer">입력</a> <!--#11-->
+						<form id="btn_file" action="/send-file" method="post" target="if" enctype="multipart/form-data">
+							<input type="hidden" name="file_roomid">
+							<input type="file" name="uploadFile" style ='display:none' onchange="show_file(this);" multiple="multiple">
+							<img src="img/icon_file.png" onclick="select_file();" style="cursor:pointer"> <!--#11-->
+							<input type="submit" name="btn_submit" style="display:none">
+						</form>
+						<iframe name="if" style="display:none"></iframe>
 					</div>
 				</div>
 			</div>
@@ -84,10 +96,33 @@
 				<div class="inner">
 					<div class="slide_wrap">
 						<div class="slide_box ty01">
-							<ul>
-								<!-- User Space -->
-							</ul>
+							<!-- User Space -->
+
 						</div>						
+					</div>
+				</div>
+
+				<div class="conversation" style="display: none;">
+					<div class="view_all">
+						<div>
+							<video id="target_video" autoplay=true playsinline=true></video>
+						</div>
+					</div>
+					
+					<div class="chat1_1_cc">
+						<p>지금은</p>
+						<p>1 : 1 대화 중</p>
+						<p>입니다</p>
+						<a onclick="end_1_1();">종료하기</a> <!--1개 띄우고 3개 없애기-->
+						<a onclick="mute_1_1();" id="mute">소리켜기</a>
+					</div>
+
+					<div class="view_lbox">
+						<div class="self_view">
+							<div>
+								<video id="my_video" autoplay=true playsinline=true></video>
+							</div>
+						</div>
 					</div>
 				</div>
 			</div>		
@@ -105,14 +140,15 @@
 						<div class="cancel">
 							<img src="img/menu_cancel.png" alt="닫기버튼" class="cancelicon"/>
 						</div>
-						<h1>함께하는 방과후 English Class1</h1>
+						<h1>함께하는 BETTER TEACHING</h1>
 						<ul>
 							<li>개설자<span class="c_y"></span></li>
 							<li>현재 참여인원<span class="c_r"></span></li>
 							<li>방 번호<span class="c_r"></span></li>
 						</ul>
 						<div class="cc_btn" style="margin-bottom: 7px;">
-							<a id="disconnect" onclick="browserDisconnect()" href="https://betterteaching.xyz/exit"><span></span>나가기</a>
+							<a id="disconnect" onclick="browserDisconnect()" href="https://localhost/exit"><span></span>나가기</a>
+						
 						</div>
 						<div class="cc_btn">
 							<a id="share" onclick="shareRequest()"><span></span>화면 공유</a>
@@ -128,16 +164,33 @@
 						<p><span class="c_y"></span>님이</p>
 						<p>1 : 1 대화를 신청하셨습니다</p>						
 						<div class="ca_btn">
-							<a href="view_share.html" class="accept"><span></span>수락하기</a>
-							<a class="refusal"><span></span>거절하기</a>
+							<!--#11-->
+							<!-- <a href="view_share.html" class="accept"><span></span>수락하기</a> -->
+							<a class="accept" onclick="accept_1_1()"><span></span>수락하기</a>
+							<a class="refusal" onclick="refusal_1_1();"><span></span>거절하기</a>
+							<!--#11-->
 						</div>
 					</div>
 				</div>
 			</div>
+
+			<div class="chat_accept" style="display: none;">
+				<div class="inner">
+					<div class="ca_box">						
+						<p><span class="c_y"></span>님이</p>
+						<p>1 : 1 대화를 거절하셨습니다</p>
+						<div class="ca_btn">
+							<a class="accept" onclick="okay_1_1();"><span></span>확인</a> -->
+						</div>
+					</div>
+				</div>
+			</div>
+			<!--#11-->
     </body>
 	<script src="../js/share.js"></script>
 	<script src="../js/oneToOne.js"></script>
 	<script src="../js/message.js"></script>
 	<script src="../js/meeting.js"></script>
 	<script src="../js/client.js"></script>
+	<script src="../js/sendFile.js"></script>
 </html>

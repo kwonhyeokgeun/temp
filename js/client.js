@@ -1,4 +1,5 @@
-const socket = io('https://betterteaching.xyz', {secure: true});
+//const socket = io('https://betterteaching.xyz', {secure: true});
+const socket = io('https://localhost', {secure: true});
 
 const pc_config = {
     iceServers: [
@@ -37,6 +38,7 @@ let userStreams = {
 };
 
 let userName;   //자신의 유저이름
+let usersName={}; //같은방 유저들의 이름, key를 socketId를 가짐
 let socketId = socket.id;
 
 let roomLeader; //같은 방 생성자
@@ -46,6 +48,10 @@ let numOfUsers; //방 접속 인원 수
 let roomTime;   //
 let shareSwitch = false;   //화면 공유 스위치 (방 당 1명 밖에 공유 못함)
 let shareSocketId;
+
+let oneoneUserId1 = null;
+let oneoneUserId2 = null;
+
 //----------------------------------------------------------------------------------------
 function show(purpose){
     console.log('sendPC',sendPC);
@@ -83,7 +89,8 @@ window.addEventListener('unload', (ev) => {
 
 function browserDisconnect() {
     socket.emit(`${roomType}_disconnect`);
-	shareDisconnect();
+    if(shareSwitch === true)
+	    shareDisconnect();
 }
 
 onload();
@@ -160,7 +167,6 @@ function createReceiverPeerConnection(senderSocketId, userName, purpose, ontrack
     pc.ontrack = (e) => {
         if(once == 1){
             ontrackHandler(e.streams[0], userName, senderSocketId);
-            console.log('한번만 나오는지')
         }
         once+=1;
     }
@@ -289,10 +295,6 @@ socket.on('get_chat', function(data) {
     getChat(data);
 });
 
-socket.on("get_1_1_request", (message) => {
-    get11Request(message);
-});
-
 socket.on("share_request", (message) => {
     shareRequestHandler(message);
 });
@@ -303,5 +305,39 @@ socket.on("share_disconnect", () => {
 
 socket.on("share_possible", () => {
     shareStart();
+});
+socket.on("get_1_1_request", (message) => {
+    get11Request(message);
+});
 
+socket.on("accept_request", (message) => {
+    get11Accept(message);
+});
+
+socket.on("refusal_request", (message) => {
+    get11Refusal(message);
+});
+
+socket.on("other_accept_request", (message) => {
+    setOther(message);
+});
+
+socket.on("other_end_request", (message) => {
+    endOther(message);
+});
+
+socket.on("other_ing_request", (message) => {
+    ingOther(message);
+});
+
+socket.on("end_request", () => {
+    get11End();
+});
+
+socket.on("mute_list_request", (message) => {
+    get11MuteList(message);
+});
+
+socket.on("other_come_request", (message) => {
+    setOther(message);
 });

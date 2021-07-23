@@ -6,6 +6,7 @@ const bodyParser = require('body-parser');
 const mysql = require('mysql');
 const wrtc = require('wrtc');
 const fs = require('fs');
+const formidable = require('formidable')
 /*
 const connection = mysql.createConnection({
     host    : 'localhost',
@@ -21,8 +22,10 @@ app.use(express.static(__dirname));
 app.use(bodyParser.urlencoded({extended: false}));
 
 const options = {
-    key: fs.readFileSync('/etc/letsencrypt/live/betterteaching.xyz/privkey.pem'),
-    cert: fs.readFileSync('/etc/letsencrypt/live/betterteaching.xyz/fullchain.pem')
+    //key: fs.readFileSync('/etc/letsencrypt/live/betterteaching.xyz/privkey.pem'),
+    //cert: fs.readFileSync('/etc/letsencrypt/live/betterteaching.xyz/fullchain.pem')
+    key: fs.readFileSync('./key/privkey.pem'),
+    cert: fs.readFileSync('./key/cert.crt')
 };
 
 const server = https.createServer(options, app).listen(443, () => {
@@ -56,10 +59,27 @@ let numOfUsers = {};
 let shareSwitch = {};  //해당 room이 true이면 현재 화면공유중
 let shareUserId={};   //해당 room의 화면공유자의 id를 가짐
 
+let oneoneUserId = {}
+
+fs.readdir(__dirname+"/uploads", function(error, filelist){ //서버 켜지면 upload 파일 삭제
+    try {
+        for(var i=0; i<filelist.length; i++){
+            delete_directory(__dirname+'/uploads/'+filelist[i]);
+        }
+        console.log("delete",filelist.length,"files in uploads");
+    }catch(error) {
+        console.log(error);
+    }       
+})
+
 //-------------------------------------------------------------------------------------
 
 app.get('/', (request, response) => {
     response.render('login.ejs');
+});
+
+app.get('/manager', (request, response) => {
+    response.render('manager.ejs');
 });
 
 app.post('/login', (request, response) => {
@@ -112,6 +132,8 @@ app.post('/make-meeting', (request, response) => {
         room_leader: undefined,
     };
     
+    make_directory(__dirname+'/uploads/'+roomId); //file upload
+	
     response.render('meeting.ejs', {
         roomId: roomId,
         userName: userName,
@@ -131,6 +153,8 @@ app.post('/make-seminar', (request, response) => {
         room_leader: undefined,
     };
     
+    make_directory(__dirname+'/uploads/'+roomId); //file upload
+	
     response.render('seminar.ejs', {
         roomId: roomId,
         userName: userName,
@@ -154,6 +178,36 @@ app.get('/seminar', (request, response) => {
 
 app.get('/exit', (request, response) => {
     response.redirect('/');
+});
+
+//file upload
+app.post('/send-file', function (request, response, next) {
+    var form = new formidable.IncomingForm();
+    form.multiples = true;
+    var roomid;
+
+    form.parse(request,function(error,fields,files) {
+        roomid = fields.file_roomid;
+        console.log('Send File : ',roomid);
+        console.log(files);
+    });
+
+    form.on('end',function() {
+        for(var i=0; i<this.openedFiles.length; i++) {
+            var oldpath = this.openedFiles[i].path
+            var newpath = __dirname + "/uploads/" + roomid + '/' + this.openedFiles[i].name;
+            fs.rename(oldpath,newpath, function(error){
+                if(error) console.log(error);
+            }); 
+        }
+    });
+    //response.send(200);
+});
+
+app.post('/download',function(request,response) {
+    var filepath = __dirname + "/uploads/"+ request.body.filename;;
+    console.log("Download : ",filepath);
+    response.download(filepath);
 });
 
 //-----------------------------------------------------------------------
@@ -207,6 +261,11 @@ io.on('connection', function(socket) {
 
             receivePCs[message.purpose][socketId] = pc;
 
+	        if(message.purpose== 'share'){ //share가 목적인 경우 share화면의 stream의 오퍼를 받는것까진 성공했으니 switch를 바꿔줌
+                shareSwitch[users[socket.id]['room_id']] = true;
+                shareUserId[users[socket.id]['room_id']]=socket.id;
+            }
+	    
             await io.to(socketId).emit("get_sender_answer", { 
                 answer,
                 purpose: message.purpose,
@@ -283,6 +342,18 @@ io.on('connection', function(socket) {
         }
     });
 
+    //노캠 사용자 입장
+    socket.on("noCam",function (data){       
+        userStreams['meeting'][socket.id] = null;
+        socket.broadcast.to(data.roomId).emit("user_enter", { //노캠 사용자의 접속을 알림
+            socketId: socket.id,
+            roomId: data.roomId,
+            userName: data.userName,
+            purpose: 'meeting',
+            stream : null
+        });
+    });
+
 
     //통신 종료
     socket.on("meeting_disconnect", () => {
@@ -319,10 +390,12 @@ io.on('connection', function(socket) {
                 delete rooms[roomId];
                 delete roomList[roomId];
                 delete numOfUsers[roomId];
+		        delete oneoneUserId[roomId];
             }
 
             if(roomList[roomId]===undefined){
                 delete roomToTime[roomId];
+		delete_directory(__dirname+'/uploads/'+roomId); //file upload
             }
         } catch (error) {
             console.error(error);
@@ -362,39 +435,51 @@ io.on('connection', function(socket) {
             }
             if(roomList[roomId]===undefined){
                 delete roomToTime[roomId];
+		        delete_directory(__dirname+'/uploads/'+roomId); //file upload
             }
         } catch(err) {
             console.error(err);
         }
         show_state('seminar')
     });
-
+    
     socket.on('share_disconnect', () => {
         console.log('share disconnect');
+        try{
+            if(!shareSwitch[users[socket.id]['room_id']]) return;
+            shareSwitch[users[socket.id]['room_id']] =false;
 
-        if(!shareSwitch[users[socket.id]['room_id']]) return;
+            receivePCs['share'][socket.id].close();
+            delete receivePCs['share'][socket.id];
+            for(var key in roomList[users[socket.id]['room_id']]) {
+                try{
+                    if(!sendPCs['share'][socket.id][key]) continue;
 
-        receivePCs['share'][socket.id].close();
-        delete receivePCs['share'][socket.id];
+                    sendPCs['share'][socket.id][key].close();
+                    delete sendPCs['share'][socket.id][key];
 
-        for(var key in roomList[users[socket.id]['room_id']]) {
-            if(!sendPCs['share'][socket.id][key]) continue;
+                    if(!userStreams['share'][socket.id][key]) continue;
 
-            sendPCs['share'][socket.id][key].close();
-            delete sendPCs['share'][socket.id][key];
+                    delete userStreams['share'][socket.id][key];
+                }
+                catch{
+                    delete userStreams['share'][socket.id][key];
+                }
 
-            if(!userStreams['share'][socket.id][key]) continue;
 
-            delete userStreams['share'][socket.id][key];
+            }
+            delete sendPCs['share'][socket.id];
+            delete userStreams['share'][socket.id]
+            socket.broadcast.to(users[socket.id]['room_id']).emit('share_disconnect');
 
+            //delete shareSwitch[users[socket.id]['room_id']];
+            
+            delete shareUserId[users[socket.id]['room_id']];
         }
-        delete sendPCs['share'][socket.id];
-        delete userStreams['share'][socket.id]
-        socket.broadcast.to(users[socket.id]['room_id']).emit('share_disconnect');
+        catch(e){
+            console.error(e);
+        }
 
-        //delete shareSwitch[users[socket.id]['room_id']];
-        shareSwitch[users[socket.id]['room_id']] =false;
-        delete shareUserId[users[socket.id]['room_id']];
     });
 
     socket.on('room_info', (message) => {
@@ -424,21 +509,92 @@ io.on('connection', function(socket) {
         });
     });
 
-    //1:1 요청
+    
     socket.on('request_1_1', (message) => {
-        let target;
-        for(var key in users) {
-            if(users[key]['user_name'] === message.target) target = key;
+        if(message.text == "1 : 1 대화신청") {
+            for(var key in roomList[message.roomId]) {
+                if(key === message.target) { // 1:1 받은 사람에게
+                    io.to(key).emit('get_1_1_request', {
+                        userName: message.userName,
+                        userId: message.socketId
+                    });
+                }
+                else if(key !== message.socketId){
+                    io.to(key).emit('other_ing_request', { // 나머지 사람에게
+                        user1Id: message.socketId,
+                        user2Id: message.target
+                    });
+                }
+            }
         }
-        console.log(message.userName);
-        io.to(target).emit('get_1_1_request', {userName: message.userName});
+    });
+ 
+    socket.on('accept_1_1', (message) => {
+        for(var key in roomList[message.roomId]) {
+            if(key === message.target) { // 1:1 건 사람에게
+                io.to(key).emit('accept_request', {
+                    userName: message.userName,
+                    userId: message.socketId
+                });
+            }
+            else if(key !== message.socketId){
+                io.to(key).emit('other_accept_request', { // 나머지 사람에게
+                    user1Id: message.socketId,
+                    user2Id: message.target
+                });
+            }
+        }
+        if (socket.id == rooms[message.roomId]['room_leader']) 
+            oneoneUserId[message.roomId] = message.target
+        else 
+            oneoneUserId[message.roomId] = socket.id
+    
+    });
+	
+    socket.on('refusal_1_1', (message) => {
+        for(var key in roomList[message.roomId]) {
+            if(key === message.target) { // 1:1 건 사람에게
+                io.to(key).emit('refusal_request',{userName: message.userName, userId: message.socketId});
+            }
+            else if(key !== message.socketId){
+                io.to(key).emit('other_end_request', { // 나머지 사람에게
+                    user1Id: message.socketId,
+                    user2Id: message.target
+                });
+            }
+        }
+    });
+
+    socket.on('end_1_1', (message) => {
+        for(var key in roomList[message.roomId]) {
+            if(key === message.target) { // 대화 상대방에게
+                io.to(key).emit('end_request');
+            }
+            else if(key !== message.socketId){
+                io.to(key).emit('other_end_request', { // 나머지 사람에게
+                    user1Id: message.socketId,
+                    user2Id: message.target
+                });
+            }
+        }
+        oneoneUserId[message.roomId]=null;
+    });
+
+    socket.on("mute_list", (message) => {
+        var others = [];
+        for(var key in roomList[message.roomId]) {
+            if(key !== message.target && key !== message.socketId) { // 대화 상대방에게
+                others.push(key);
+            }
+        }
+        socket.emit("mute_list_request", {others : others});
     });
 
     //화면 공유
-    socket.on('display_share', (message) => {
+    // socket.on('display_share', (message) => {
 
-    });
-
+    // });
+	
     socket.on('set_room_time', function(data) {
         if(roomToTime[data.roomId]===undefined)
             roomToTime[data.roomId]=data.time;
@@ -477,7 +633,8 @@ io.on('connection', function(socket) {
         console.log("share sendPCs:",sendPCs['share'])
         console.log(data," receivePCs:",receivePCs[data])
         console.log("share receivePCs:",receivePCs['share'])
-        console.log("userStreams:",userStreams['share'])
+        console.log("share userStreams:",userStreams['share'])
+        console.log("userStreams:",userStreams[data])
         //console.log("roomList",roomList);
         console.log("users",users)
         console.log("roomList:",roomList)
@@ -498,9 +655,21 @@ io.on('connection', function(socket) {
         if(shareSwitch[users[socket.id]['room_id']]) return;
 
         io.to(socket.id).emit("share_possible");
-        shareSwitch[users[socket.id]['room_id']] = true;
-        shareUserId[users[socket.id]['room_id']]=socket.id;
+        //shareSwitch[users[socket.id]['room_id']] = true;       //여기서 해주려다가 공유를 취소해도 true가 되는 에러를 방지하기위해 sender_offer로 옮김
+        //shareUserId[users[socket.id]['room_id']]=socket.id;
     });
+
+    socket.on('reqUserInfo',function (data){ //보여줄 정보 전달
+        socket.emit('ansUserInfo',{
+            roomList:roomList,
+            rooms:rooms,
+            users:users,
+            //userStreams:userStreams,
+            numOfUsers:numOfUsers,
+        })
+    })
+
+
 });
 
 function createSenderPeerConnection(receiverSocketId, senderSocketId, stream, purpose) {
@@ -544,7 +713,6 @@ function createReceiverPeerConnection(socket, roomId, userName, ontrackHandler, 
     var once_ontrack=1
     pc.ontrack = (e) => {
         if(once_ontrack==1){ //video, audio로 두번하므로 한번만 하도록
-            console.log("once check");
             ontrackHandler(e.streams[0], socket, roomId, userName);
         }
         once_ontrack+=1;
@@ -592,6 +760,7 @@ function meetingOntrackHandler(stream, socket, roomId, userName) {
         roomId: roomId,
         userName: userName,
         purpose: 'meeting',
+        stream : stream
     });
     
     //이전 채팅 보내기 
@@ -649,11 +818,13 @@ function meetingJoinRoomHandler(message, socket) {
             rows.push({
                 socket_id: key,
                 user_name: users[key]['user_name'],
+                stream : userStreams['meeting'][key]
             });
         }
         if(rows.length !== 0) {
             io.to(message.senderSocketId).emit("all_users", { 
                 users: rows,
+                oneoneUserId: oneoneUserId[message.roomId]
             });
         }
         socket.join(message.roomId);
@@ -775,4 +946,26 @@ function show_state(purpose){
     console.log("roomList:",roomList)
     console.log("rooms:",rooms)
     console.log('numOfUsers',numOfUsers);
+}
+
+//file upload
+function make_directory(path) {
+    // uploads 디렉토리 안 방별 디렉토리 없으면 생성
+    const isExist = fs.existsSync(path);
+    if(!isExist) {
+        fs.mkdirSync(path, {recursive : true});
+        console.log("make",path);
+    }
+}
+
+function delete_directory(path) { //uploads 안의 방별 디렉토리 삭제
+    const isExist = fs.existsSync(path);
+    if(isExist) {
+        fs.readdirSync(path).forEach(function(file) {
+                fs.unlinkSync(path+'/'+file);
+                console.log("delete",path+'/'+file);
+        });
+        
+        fs.rmdirSync(path);
+    }
 }
